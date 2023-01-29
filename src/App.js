@@ -1,73 +1,80 @@
-import { useEffect, useState, useRef } from "react";
-import FlashcardList from "./components/FlashcardList";
-import axios from "axios";
+import { useState, useEffect, useRef } from "react";
+
+import Header from "./components/Header";
+import Figure from "./components/Figure";
+import WrongLetters from "./components/WrongLetters";
+import Word from "./components/Word";
+import Notification from "./components/Notification";
+import Popup from "./components/Popup";
 
 function App() {
-  const [flashcards, setFlashcards] = useState([])
-  const [categories, setCategories] = useState([])
+  const words = ['application', 'programming', 'interface', 'wizard', 'notification', 'javascript', 'physiology', 'compartmentalize', 'computer', 'relationship']
+  let word = words[Math.floor(Math.random() * words.length)]
+  const selectedWord = useRef(word)
 
-  const categoryEl = useRef()
-  const amountEl = useRef()
+  const [playable, setPlayable] = useState(true)
+  const [correctLetters, setCorrectLetters] = useState([])
+  const [wrongLetters, setWrongLetters] = useState([])
+  const [showNotification, setShowNotification] = useState(false)
 
-  useEffect(() => {
-    axios.get('https://opentdb.com/api_category.php')
-    .then(res => {
-      setCategories(res.data.trivia_categories)
-    })
-  }, [])
-
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    axios.get('https://opentdb.com/api.php', {
-      params: {
-        amount: amountEl.current.value,
-        category: categoryEl.current.value
-      }})
-         .then(res => {
-          setFlashcards(res.data.results.map((questionItem, index) => {
-            const answer = decodeString(questionItem.answer)
-            const options = [...questionItem.incorrect_answers.map(a => decodeString(a)), answer]
-            return {
-              id: `${index}-${Date.now()}`,
-              question: decodeString(questionItem.question),
-              answer: decodeString(questionItem.correct_answer),
-              options: options.sort(() => Math.random() - 0.5)
-            }
-          }))
-         })
+  const notification = () => {
+    setShowNotification(true)
+    setTimeout(() => {
+      setShowNotification(false)
+    }, 2000)
   }
 
-  return (
-    <>
-    <form className="header" onSubmit={handleSubmit}>
-      <div className="form-group">
-        <label htmlFor="category">Category</label>
-        <select id="category" ref={categoryEl}>
-          {categories.map(category => {
-            return <option value={category.id} key={category.id}>{category.name}</option>
-          })}
-        </select>
-      </div>
-      <div className="form-group">
-        <label htmlFor="amount">Number of Questions</label>
-        <input type="number" id="amount" min="1" step="1" defaultValue={10} ref={amountEl}></input>
-      </div>
-      <div className="form-group">
-        <button className="btn">Generate</button>
-      </div>
-    </form>
-    <div className="container">
-      <FlashcardList flashcards={flashcards} />
-    </div>
-    </>
-  )
-}
+  useEffect(() => {
+    const handleKeydown = (event) => {
+      const {key, keyCode} = event
+      if(playable && keyCode >= 65 && keyCode <= 90) {
+        const letter = key.toLowerCase()
 
-const decodeString = (str) => {
-  const textArea = document.createElement('textarea')
-  textArea.innerHTML = str
-  return textArea.value
+        if(selectedWord.current.includes(letter)) {
+          if(!correctLetters.includes(letter)) {
+            setCorrectLetters(correctLetters => [...correctLetters, letter])
+          } else {
+              notification()
+          }
+        } else {
+          if(!wrongLetters.includes(letter)) {
+            setWrongLetters(wrongLetters => [...wrongLetters, letter])
+          } else {
+             notification()
+          }
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeydown)
+
+    return () => window.removeEventListener('keydown', handleKeydown)
+  }, [correctLetters, wrongLetters, playable, selectedWord])
+
+  const playAgain = () => {
+    setPlayable(true)
+    setCorrectLetters([])
+    setWrongLetters([])
+
+    let random = Math.floor(Math.random() * words.length)
+    selectedWord.current = words[random]
+
+  
+  }
+
+
+  return (
+   <>
+     <Header />
+     <div className="game-container">
+        <Figure wrongLetters={wrongLetters} />
+        <WrongLetters wrongLetters={wrongLetters} />
+        <Word selectedWord={selectedWord.current} correctLetters={correctLetters} />
+        <Popup correctLetters={correctLetters} wrongLetters={wrongLetters} selectedWord={selectedWord.current} setPlayable={setPlayable} playAgain={playAgain} />
+        <Notification showNotification={showNotification} />
+     </div>
+   </>
+  )
 }
 
 export default App;
